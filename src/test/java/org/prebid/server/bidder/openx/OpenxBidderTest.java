@@ -224,7 +224,7 @@ public class OpenxBidderTest extends VertxTest {
                                 .ext(mapper.valueToTree(
                                         ExtPrebid.of(
                                                 ExtImpPrebid.builder()
-                                                        .isRewardedInventory(true).build(),
+                                                        .isRewardedInventory(1).build(),
                                                 ExtImpOpenx.builder()
                                                         .customFloor(BigDecimal.valueOf(0.1))
                                                         .customParams(givenCustomParams("foo3", "bar3"))

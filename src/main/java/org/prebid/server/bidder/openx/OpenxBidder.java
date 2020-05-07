@@ -10,7 +10,6 @@ import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
 import io.vertx.core.http.HttpMethod;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.BooleanUtils;
 import org.prebid.server.bidder.Bidder;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderError;
@@ -167,7 +166,8 @@ public class OpenxBidder implements Bidder<BidRequest> {
 
         if (resolveImpType(imp) == OpenxImpType.video
                 && prebidImpExt != null
-                && BooleanUtils.isTrue(prebidImpExt.getIsRewardedInventory())) {
+                && prebidImpExt.getIsRewardedInventory() != null
+                && prebidImpExt.getIsRewardedInventory() == 1) {
             impBuilder.video(imp.getVideo().toBuilder()
                                 .ext(mapper.mapper().valueToTree(OpenxVideoExt.of(1)))
                                 .build());
