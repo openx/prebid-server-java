@@ -27,7 +27,6 @@ import org.prebid.server.exception.PreBidException;
 import org.prebid.server.json.DecodeException;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
-import org.prebid.server.proto.openrtb.ext.request.ExtImpAuctionEnvironment;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.openx.ExtImpOpenx;
@@ -50,6 +49,10 @@ public class OpenxBidder implements Bidder<BidRequest> {
 
     private static final String OPENX_CONFIG = "hb_pbs_1.0.0";
     private static final String DEFAULT_BID_CURRENCY = "USD";
+
+    private static final String KEY_IMP_EXT_DATA = "data";
+    private static final String KEY_IMP_EXT_GPID = "gpid";
+    private static final String KEY_IMP_EXT_SKADN = "skadn";
 
     private static final TypeReference<ExtPrebid<ExtImpPrebid, ExtImpOpenx>> OPENX_EXT_TYPE_REFERENCE =
             new TypeReference<>() {
@@ -181,7 +184,7 @@ public class OpenxBidder implements Bidder<BidRequest> {
         final Imp.ImpBuilder impBuilder = imp.toBuilder()
                 .tagid(openxImpExt.getUnit())
                 .bidfloor(resolveBidFloor(imp.getBidfloor(), openxImpExt.getCustomFloor()))
-                .ext(makeImpExt(openxImpExt.getCustomParams(), impExt.getAuctionEnvironment()));
+                .ext(makeImpExt(impExt, imp));
 
         if (resolveImpType(imp) == OpenxImpType.video
                 && prebidImpExt != null
@@ -226,10 +229,30 @@ public class OpenxBidder implements Bidder<BidRequest> {
         return impExt;
     }
 
-    private ObjectNode makeImpExt(Map<String, JsonNode> customParams, ExtImpAuctionEnvironment auctionEnvironment) {
-        return customParams != null || auctionEnvironment != ExtImpAuctionEnvironment.SERVER_SIDE_AUCTION
-                ? mapper.mapper().valueToTree(OpenxImpExt.of(customParams, auctionEnvironment))
-                : null;
+    private ObjectNode makeImpExt(ExtPrebid<ExtImpPrebid, ExtImpOpenx> impExtPrebid, Imp imp) {
+        final ObjectNode impExt = imp.getExt();
+
+        return mapper.mapper().valueToTree(
+                OpenxImpExt.builder()
+                        .customParams(impExtPrebid.getBidder().getCustomParams())
+                        .auctionEnvironment(impExtPrebid.getAuctionEnvironment())
+                        .gpid(extractGpid(impExt))
+                        .data(extractFromExt(impExt, KEY_IMP_EXT_DATA))
+                        .skadn(extractFromExt(impExt, KEY_IMP_EXT_SKADN))
+                        .build());
+    }
+
+    private static String extractGpid(ObjectNode impExt) {
+        return Optional.ofNullable(impExt.get(KEY_IMP_EXT_GPID))
+                .filter(JsonNode::isTextual)
+                .map(JsonNode::asText)
+                .orElse(null);
+    }
+
+    private static JsonNode extractFromExt(ObjectNode impExt, String key) {
+        return Optional.ofNullable(impExt.get(key))
+                .filter(JsonNode::isObject)
+                .orElse(null);
     }
 
     private static List<BidderBid> extractBids(BidRequest bidRequest, OpenxBidResponse bidResponse) {

@@ -2,6 +2,7 @@ package org.prebid.server.bidder.openx;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import com.iab.openrtb.request.Audio;
 import com.iab.openrtb.request.Banner;
 import com.iab.openrtb.request.BidRequest;
@@ -43,6 +44,7 @@ import java.util.Map;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -345,6 +347,84 @@ public class OpenxBidderTest extends VertxTest {
                                         .build())
                                 .regs(Regs.builder().coppa(0).ext(ExtRegs.of(1, null)).build())
                                 .build());
+    }
+
+    @Test
+    public void makeHttpRequestsShouldPassThroughImpExtGpid() {
+        // given
+        final BidRequest bidRequest = BidRequest.builder()
+                .imp(singletonList(Imp.builder()
+                        .bidfloor(BigDecimal.ZERO)
+                        .video(Video.builder().build())
+                        .ext(mapper.valueToTree(
+                                Map.of("bidder", emptyMap(),
+                                        "gpid", "gpidvalue")))
+                        .build()))
+                .build();
+
+        // when
+        final Result<List<HttpRequest<BidRequest>>> result = openxBidder.makeHttpRequests(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.getValue())
+                .extracting(HttpRequest::getPayload)
+                .flatExtracting(BidRequest::getImp)
+                .extracting(Imp::getExt)
+                .extracting(ext -> ext.get("gpid"))
+                .containsExactly(TextNode.valueOf("gpidvalue"));
+    }
+
+    @Test
+    public void makeHttpRequestsShouldPassThroughImpExtData() {
+        // given
+        final BidRequest bidRequest = BidRequest.builder()
+                .imp(singletonList(Imp.builder()
+                        .bidfloor(BigDecimal.ZERO)
+                        .video(Video.builder().build())
+                        .ext(mapper.valueToTree(
+                                    Map.of("data", Map.of("pbadslot", "adslotvalue"),
+                                            "bidder", emptyMap())))
+                        .build()))
+                .build();
+
+        // when
+        final Result<List<HttpRequest<BidRequest>>> result = openxBidder.makeHttpRequests(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.getValue())
+                .extracting(HttpRequest::getPayload)
+                .flatExtracting(BidRequest::getImp)
+                .extracting(Imp::getExt)
+                .extracting(ext -> ext.at("/data/pbadslot"))
+                .containsExactly(TextNode.valueOf("adslotvalue"));
+    }
+
+    @Test
+    public void makeHttpRequestsShouldPassThroughImpExtSkAdn() {
+        // given
+        final BidRequest bidRequest = BidRequest.builder()
+                .imp(singletonList(Imp.builder()
+                        .bidfloor(BigDecimal.ZERO)
+                        .video(Video.builder().build())
+                        .ext(mapper.valueToTree(
+                                Map.of("skadn", Map.of("version", "2.0"),
+                                        "bidder", emptyMap())))
+                        .build()))
+                .build();
+
+        // when
+        final Result<List<HttpRequest<BidRequest>>> result = openxBidder.makeHttpRequests(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.getValue())
+                .extracting(HttpRequest::getPayload)
+                .flatExtracting(BidRequest::getImp)
+                .extracting(Imp::getExt)
+                .extracting(ext -> ext.at("/skadn/version"))
+                .containsExactly(TextNode.valueOf("2.0"));
     }
 
     @Test
